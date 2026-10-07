@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>BWMS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one phone-width column; sticky job bar with running timer; one card per pick line; summary as the last page. */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --ink:#14232b; --muted:#5a6b72; --line:#cfd8d6;
+  --accent:#0b5c8a; --on-accent:#ffffff;
+  --ok:#1f7a4a; --ok-bg:#e0f2e7; --warn:#8a5a00; --warn-bg:#fbeecb; --bad:#a32a2a; --bad-bg:#fbe3e1;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --action:#F6BD16; --action-ink:#1A1400; --label:"Barlow Semi Condensed","Arial Narrow","Barlow",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10191d; --surface:#1a262c; --ink:#e8eeec; --muted:#9db0b5; --line:#33444b;
+  --accent:#5fb4e0; --on-accent:#06202e;
+  --ok:#7fd3a3; --ok-bg:#173a28; --warn:#f0c463; --warn-bg:#3d3013; --bad:#f29a94; --bad-bg:#43201f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10191d; --surface:#1a262c; --ink:#e8eeec; --muted:#9db0b5; --line:#33444b;
+  --accent:#5fb4e0; --on-accent:#06202e;
+  --ok:#7fd3a3; --ok-bg:#173a28; --warn:#f0c463; --warn-bg:#3d3013; --bad:#f29a94; --bad-bg:#43201f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--body);padding-inline:16px;padding-block:0 40px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font:600 30px/1.1 var(--display);margin:0;letter-spacing:.01em;text-wrap:balance}
+h2{font:600 22px/1.15 var(--display);margin:0}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.sample{font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:6px 10px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--ink);color:var(--bg);margin-inline:-16px;padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.bar .lbl{color:inherit;opacity:.7}
+.timer{font:500 26px/1 var(--mono);font-variant-numeric:tabular-nums}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1 1 140px;min-width:0}
+.kv{display:flex;flex-direction:column;gap:2px;min-width:0}
+.kv b{font-weight:600;overflow-wrap:anywhere}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+input,select{font:500 18px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px 12px;width:100%;min-height:48px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{font:600 17px var(--body);min-height:50px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);padding:10px 16px;cursor:pointer}
+a.btn{display:block;text-align:center;text-decoration:none;font:600 17px var(--body);border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);padding:13px 16px}
+a.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.err{color:var(--bad);font-size:14px;font-weight:600}
+.pill{display:inline-block;font-size:13px;font-weight:600;border-radius:999px;padding:3px 11px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.loc{font:600 28px/1 var(--display);letter-spacing:.02em}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.need{font:600 28px/1 var(--display);white-space:nowrap}
+.card.done{border-color:var(--ok)} .card.stop{border-color:var(--bad)}
+.alt{display:flex;flex-direction:column;gap:12px;border:1px dashed var(--muted);border-radius:8px;padding:12px}
+.scroll{overflow-x:auto}
+#pMenu{padding-top:20px;gap:0}
+#pMenu h1{font:700 30px/1.1 var(--label);margin:0 0 4px;letter-spacing:0}
+#pMenu .lede{margin:0 0 20px;color:var(--muted);font-size:17px}
+.menu{display:grid;gap:10px}
+.group{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.group>button{width:100%;min-height:68px;display:grid;grid-template-columns:1fr 24px;align-items:center;gap:12px;text-align:left;font-family:var(--label);font-weight:700;font-size:26px;color:var(--ink);background:none;border:0;border-left:6px solid var(--line);border-radius:0;padding:14px 16px 14px 14px;cursor:pointer}
+.group.open>button{border-left-color:var(--action)}
+.group>button:focus-visible,.sub a:focus-visible{outline:3px solid var(--action);outline-offset:-3px}
+.group>button svg{width:22px;height:22px;stroke:var(--muted);transition:transform .15s}
+.group.open>button svg{transform:rotate(180deg)}
+@media (prefers-reduced-motion:reduce){.group>button svg{transition:none}}
+.sub{border-top:1px solid var(--line);padding:8px;display:grid;gap:6px}
+.sub a{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;min-height:60px;padding:8px 12px;border-radius:8px;background:var(--bg);color:var(--ink);text-decoration:none;cursor:pointer}
+.sub a b{display:block;font-family:var(--label);font-weight:600;font-size:21px;line-height:1.15}
+.sub a small{display:block;font-size:15px;color:var(--muted)}
+.sub a .num{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;font-family:var(--label);font-weight:700;font-size:18px;background:var(--action);color:var(--action-ink)}
+.sub p{margin:6px 8px;color:var(--muted);font-size:16px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile b{font:600 34px/1 var(--display);font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;font-weight:600;color:var(--muted);line-height:1.2}
+.pill.idle{background:var(--line);color:var(--ink)} .pill.info{background:var(--accent);color:var(--on-accent)}
+.job{gap:8px}
+.job .pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.job .no{font:600 22px/1.1 var(--display)}
+.meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.meter i.full{background:var(--ok)}
+.tag{font-size:12px;color:var(--muted);font-weight:500}
+.clock{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.left{font:500 14px/1 var(--mono);font-variant-numeric:tabular-nums;border-radius:999px;padding:4px 10px;background:var(--ok-bg);color:var(--ok);white-space:nowrap}
+.left.over{background:var(--bad-bg);color:var(--bad)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+textarea{width:100%;min-height:150px;font:500 13px/1.4 var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+.drop{border:2px dashed var(--accent);border-radius:10px;padding:22px 16px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:6px;font-weight:600;color:var(--accent);background:var(--surface)}
+.drop.over{background:var(--ok-bg)}
+.drop small{font-weight:400;color:var(--muted);font-size:14px}
+.ok-t{color:var(--ok);font-weight:600;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<!-- BWMS menu: same layout as the BWMS inbound photo build -->
+<section id="pMenu" class="wrap">
+  <h1>BWMS</h1>
+  <p class="lede">Warehouse support tools. Choose a function.</p>
+  <div class="menu">
+    <div class="group" data-g="inbound">
+      <button type="button" aria-expanded="false" aria-controls="g-inbound">Inbound<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="sub" id="g-inbound" hidden>
+        <a href="#" data-soon="1"><span class="num">1</span><span><b>SKU inbound (Photo)</b><small>Five photos for each SKU received</small></span></a>
+        <a href="#" data-soon="1"><span class="num">2</span><span><b>Container inbound (Photo)</b><small>Five photos for each container unstuffed</small></span></a>
+        <p id="soonNote" hidden>Not in this sample. It opens as normal in your current BWMS and in the final HTML.</p>
+      </div>
+    </div>
+    <div class="group" data-g="outbound">
+      <button type="button" aria-expanded="false" aria-controls="g-outbound">Outbound<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="sub" id="g-outbound" hidden>
+        <a href="#" id="mPick"><span class="num">1</span><span><b>Picking</b><small>Pick ticket to phone picking</small></span></a>
+        <a href="#" id="mDash"><span class="num">2</span><span><b>Outbound dashboard</b><small>Status of every pick list issued</small></span></a>
+      </div>
+    </div>
+    <div class="group" data-g="inventory">
+      <button type="button" aria-expanded="false" aria-controls="g-inventory">Inventory<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="sub" id="g-inventory" hidden><p>No functions yet.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Outbound dashboard -->
+<section id="pDash" class="wrap" style="padding-top:28px" hidden>
+  <div><div class="lbl">BWMS · Outbound</div><h1>Outbound dashboard</h1></div>
+  <div id="dMsg" class="muted" style="font-size:14px"></div>
+  <div class="tiles" id="dTiles"></div>
+  <div id="dList" class="wrap"></div>
+  <form id="fStore" class="card" novalidate>
+    <h2>Google Sheet connection</h2>
+    <label for="storeUrl">Web app URL (ends in /exec)<input id="storeUrl" class="mono" style="font-size:13px" autocomplete="off" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
+    <div id="storeMsg" class="muted" style="font-size:14px"></div>
+    <button type="submit">Save and test connection</button>
+  </form>
+  <button id="btnDashMenu" type="button" class="ghost">Back to BWMS menu</button>
+</section>
+
+<!-- Admin: turn a pick ticket into a picker link -->
+<section id="pAdmin" class="wrap" style="padding-top:28px" hidden>
+  <div><div class="lbl">BWMS · Outbound · Picking</div><h1>Create pick link</h1></div>
+  <label class="drop" id="drop" for="file">
+    <span>Drag the pick ticket PDF here, or tap to choose</span>
+    <small>Infolog "Pick List By Order" PDF</small>
+    <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+  </label>
+  <div id="fileMsg" class="ok-t" hidden></div>
+  <div class="card">
+    <div class="head"><h2 id="aTitle"></h2><span id="aTag" class="pill warn">Sample ticket</span></div>
+    <div id="aFacts"></div>
+    <div class="scroll"><table id="aTable"></table></div>
+  </div>
+  <div class="card">
+    <h2>Send to picker</h2>
+    <label for="link">Picker link<input id="link" readonly class="mono" style="font-size:13px"></label>
+    <button id="btnLink" type="button">Copy picker link</button>
+    <button id="btnOpen" type="button" class="ghost">Open picking page here</button>
+    <div class="muted" style="font-size:14px">Pickers open the link and enter their name. Registered for this test: Kumar, Munis.</div>
+    <div id="linkStore" style="font-size:14px;font-weight:600"></div>
+  </div>
+  <button id="btnMenu" type="button" class="ghost">Back to BWMS menu</button>
+</section>
+
+<!-- Picker: sign in -->
+<section id="pLogin" class="wrap" style="padding-top:28px" hidden>
+  <div><div class="lbl">BWMS · Outbound</div><h1 id="lTitle">Picking</h1></div>
+  <div class="card" id="lFacts"></div>
+  <form id="fLogin" class="card" novalidate>
+    <label for="uid">Your name
+      <input id="uid" autocomplete="off" autocapitalize="words" placeholder="e.g. Kumar">
+    </label>
+    <div id="loginErr" class="err" hidden></div>
+    <button type="submit">Start picking</button>
+    <div class="muted" style="font-size:14px">The timer starts when you press Start.</div>
+  </form>
+  <button id="btnBack" type="button" class="ghost">Back to admin page</button>
+</section>
+
+<!-- Picker: picking -->
+<section id="pPick" class="wrap" hidden>
+  <div class="bar">
+    <div class="kv"><span class="lbl">Pick list <span id="barNo"></span> · <span id="who"></span></span><span id="prog" style="font-weight:600"></span><span id="sync" style="font-size:12px;opacity:.8"></span></div>
+    <div class="clock">
+      <div class="timer" id="timer" aria-label="Time elapsed">00:00:00</div>
+      <div class="left" id="left" aria-label="Time left against standard"></div>
+    </div>
+  </div>
+  <div id="lines" class="wrap"></div>
+  <div id="finErr" class="err" hidden></div>
+  <button id="btnFinish" type="button">Finish pick list</button>
+</section>
+
+<!-- Picker: summary -->
+<section id="pSum" class="wrap" hidden style="padding-top:28px">
+  <div><div class="lbl">BWMS · Picking summary</div><h1 id="sTitle"></h1></div>
+  <div class="card" id="sumFacts"></div>
+  <div class="card">
+    <h2>Lines</h2>
+    <div class="scroll"><table id="sumTable"></table></div>
+  </div>
+  <div class="card">
+    <h2>Send to admin</h2>
+    <div id="sync2" style="font-weight:600;font-size:15px"></div>
+    <a id="btnWa" class="btn" target="_blank" rel="noopener" href="https://wa.me/">Send by WhatsApp</a>
+    <div class="muted" style="font-size:14px">WhatsApp opens with the report filled in. Choose the owner or group, then tap send.</div>
+    <button id="btnCopy" type="button" class="ghost">Copy report as table (Excel or email)</button>
+    <textarea id="sumText" readonly hidden aria-label="Report text"></textarea>
+  </div>
+  <button id="btnSumMenu" type="button" class="ghost">Back to BWMS menu</button>
+</section>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const USERS=["Kumar","Munis"];
+const SAMPLE={p:"215445",ref:"142401-215445",z:"FZ",c:"66200041 - Cash Sales",d:"SHIP DOCK",L:[
+  [1,"UNIT 03-01","PL2610-00627","7211003790","CY638 - TEFAL EXPRESS INDUCTION MULTI COOKER 5L","1 CTN = 1 PCS",2,"PCS"],
+  [2,"UNIT 03-01","PLT-62436-13","7211003790","CY638 - TEFAL EXPRESS INDUCTION MULTI COOKER 5L","1 CTN = 1 PCS",25,"PCS"],
+  [3,"HJ-18-05-2","PL2609-07630","7211003790","CY638 - TEFAL EXPRESS INDUCTION MULTI COOKER 5L","1 CTN = 1 PCS",1,"PCS"]]};
+const STD_MS=3600000/120; /* standard: 120 qty in 1 hour = 30 seconds per qty */
+const NEEDS_ALT=["Damaged","Missing","Insufficient"];
+let RAW=null,ORDER=null,S={},fromLink=false;
+const $=id=>document.getElementById(id);
+const p2=n=>String(n).padStart(2,"0");
+const dur=ms=>{const s=Math.max(0,Math.round(ms/1000));return p2(Math.floor(s/3600))+":"+p2(Math.floor(s/60)%60)+":"+p2(s%60)};
+const fDate=d=>p2(d.getDate())+"/"+p2(d.getMonth()+1)+"/"+d.getFullYear();
+const fTime=d=>p2(d.getHours())+":"+p2(d.getMinutes())+":"+p2(d.getSeconds());
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const dec=h=>JSON.parse(decodeURIComponent(escape(atob(h.replace(/-/g,"+").replace(/_/g,"/")))));
+const factsHtml=f=>'<div class="row">'+f.map(x=>`<div class="kv"><span class="lbl">${x[0]}</span><b>${esc(x[1])}</b></div>`).join("")+"</div>";
+
+//PARSE-START
+function parseTicket(pages){
+  const all=pages.flat(),find=re=>all.find(i=>re.test(i.s));
+  const val=re=>{const l=find(re);if(!l)return"";
+    const c=all.filter(i=>i!==l&&Math.abs(i.y-l.y)<4&&i.x>l.x&&i.s!==":").sort((a,b)=>a.x-b.x)[0];
+    return c?c.s.replace(/^:\s*/,"").trim():""};
+  const so=find(/^\d+\s*\/\s*\d+$/),zn=find(/Picking Zone/i);
+  const o={p:(so?so.s.split("/")[0]:val(/^Order No/i)).trim().slice(0,6),ref:val(/^Order Ref/i),
+    z:zn?(zn.s.includes(":")?zn.s.split(":")[1].trim():val(/Picking Zone/i)):"",c:val(/^Customer Code/i),d:val(/^Destination/i),L:[]};
+  const H={line:/^Line\s*#/i,loc:/^Location$/i,pallet:/^From Pallet/i,sku:/^Product Code/i,desc:/^Description/i,pack:/^Pack Size/i,task:/^Task Qty/i,end:/^Qty Picked/i};
+  for(const pg of pages){
+    const cols=[];let ok=true;
+    for(const k in H){const it=pg.find(i=>H[k].test(i.s));if(it)cols.push({k,x:it.x,y:it.y});else if(k!=="end")ok=false}
+    if(!ok)continue;
+    cols.sort((a,b)=>a.x-b.x);
+    const top=Math.min(...cols.map(c=>c.y)),tot=pg.find(i=>/^Total\s*:/i.test(i.s)),foot=pg.find(i=>/^Print Date/i.test(i.s));
+    const floor=Math.max(tot?tot.y:-1,foot?foot.y:-1);
+    const body=pg.filter(i=>i.y<top-2&&i.y>floor+2).sort((a,b)=>b.y-a.y||a.x-b.x);
+    let cur=null;
+    for(const it of body){
+      let k="line";for(const c of cols)if(c.x<=it.x+12)k=c.k;
+      if(k==="end")continue;
+      if(k==="line"&&/^\d+$/.test(it.s)){cur={n:+it.s,loc:"",pallet:"",sku:"",desc:"",pack:"",task:""};o.L.push(cur);continue}
+      if(cur)cur[k]=(cur[k]?cur[k]+" ":"")+it.s;
+    }
+  }
+  o.L=o.L.filter(l=>l.loc||l.sku).map(l=>{const m=/(\d+)\s*(\w*)/.exec(l.task)||[0,"0",""];return [l.n,l.loc,l.pallet,l.sku,l.desc,l.pack,+m[1],m[2]||"PCS"]});
+  return o;
+}
+//PARSE-END
+
+function setOrder(o){
+  RAW=o;
+  ORDER={...o,lines:o.L.map(a=>({n:a[0],loc:a[1],pallet:a[2],sku:a[3],desc:a[4],pack:a[5],task:a[6],uom:a[7]}))};
+  ORDER.total=ORDER.lines.reduce((t,l)=>t+l.task,0);ORDER.uom=ORDER.lines[0]?ORDER.lines[0].uom:"PCS";
+  ORDER.std=ORDER.total*STD_MS;
+}
+function orderFacts(){return [["Pick list",ORDER.p],["Order ref",ORDER.ref||"-"],["Customer",ORDER.c||"-"],["Destination",ORDER.d||"-"],["Total",ORDER.lines.length+" lines · "+ORDER.total+" "+ORDER.uom],["Standard time",dur(ORDER.std)]]}
+function show(id){["pMenu","pDash","pAdmin","pLogin","pPick","pSum"].forEach(p=>$(p).hidden=p!==id);window.scrollTo(0,0)}
+
+/* ---------- Shared store (Google Sheet web app) ---------- */
+const lsGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return""}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+let STORE=lsGet("bwms.store"),OUT=[],flushing=false,sendErr="";
+try{OUT=JSON.parse(lsGet("bwms.outbox")||"[]")||[]}catch(e){OUT=[]}
+const saveOut=()=>lsSet("bwms.outbox",JSON.stringify(OUT));
+function send(action,data){
+  if(!STORE||!ORDER)return;
+  OUT.push({u:STORE,b:JSON.stringify(Object.assign({action,p:ORDER.p},data))});saveOut();syncMsg();flush();
+}
+async function flush(){
+  if(flushing)return;flushing=true;
+  while(OUT.length){
+    const m=OUT[0];
+    try{
+      const r=await fetch(m.u,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:m.b});
+      const j=await r.json();if(!j.ok)throw new Error(j.error||"The Sheet refused the update");
+      OUT.shift();saveOut();sendErr="";
+    }catch(e){sendErr=String(e&&e.message||e);break}
+    syncMsg();
+  }
+  flushing=false;syncMsg();
+}
+function syncMsg(){
+  const n=OUT.length,t=!STORE?"":n?n+" update"+(n>1?"s":"")+" waiting to send":"All updates sent";
+  $("sync").textContent=t;
+  $("sync2").textContent=!STORE?"":n?n+" update"+(n>1?"s":"")+" not sent yet. Keep this page open until it says sent.":"Result sent to the owner's dashboard.";
+  $("sync2").style.color=n?"var(--bad)":"var(--ok)";
+}
+setInterval(()=>{if(OUT.length)flush()},10000);
+window.addEventListener("online",flush);
+
+/* ---------- Outbound dashboard ---------- */
+let DASH=null,dashErr="",dashBusy=false;
+async function loadDash(){
+  if(!STORE||dashBusy||$("pDash").hidden)return;
+  dashBusy=true;
+  try{
+    const r=await fetch(STORE,{cache:"no-store"}),j=await r.json();
+    if(!j.ok)throw new Error(j.error||"The Sheet returned an error");
+    DASH={jobs:j.jobs||[],now:j.now||Date.now(),at:Date.now()};dashErr="";
+  }catch(e){dashErr="Could not read the Google Sheet. Check the internet connection and the web app URL. ("+String(e&&e.message||e)+")"}
+  dashBusy=false;renderDash();
+}
+function renderDash(){
+  if($("pDash").hidden)return;
+  const msg=$("dMsg");
+  $("storeUrl").value=$("storeUrl").value||STORE;
+  if(!STORE){msg.textContent="Not connected. Paste the Google Sheet web app URL below to see every pick list issued.";msg.className="sample";$("dTiles").innerHTML="";$("dList").innerHTML="";return}
+  if(dashErr){msg.textContent=dashErr;msg.className="err"}
+  else{msg.textContent=DASH?"Refreshed "+fTime(new Date(DASH.at))+". Updates every 8 seconds.":"Loading...";msg.className="muted"}
+  if(!DASH)return;
+  const J=DASH.jobs,st=j=>j.status==="Completed"?"done":j.status==="Picking"?"pick":"new",n=k=>J.filter(j=>st(j)===k).length;
+  $("dTiles").innerHTML=[["Issued",J.length],["Not started",n("new")],["Picking",n("pick")],["Completed",n("done")]]
+    .map(t=>`<div class="tile"><b>${t[1]}</b><span>${t[0]}</span></div>`).join("");
+  const ord={pick:0,new:1,done:2},srvNow=DASH.now+(Date.now()-DASH.at);
+  $("dList").innerHTML=J.length?J.slice().sort((a,b)=>ord[st(a)]-ord[st(b)]||(b.updated||0)-(a.updated||0)).map(j=>{
+    const k=st(j),std=j.total*STD_MS,el=k==="pick"?srvNow-j.start:k==="done"&&j.end&&j.start?j.end-j.start:0,short=j.total-j.qty,pct=j.total?Math.min(100,Math.round(100*j.qty/j.total)):0;
+    let pills=k==="new"?'<span class="pill idle">Not started</span>':k==="pick"?'<span class="pill info">Picking</span>':'<span class="pill ok">Completed</span>';
+    if(k!=="new"&&el>std)pills+='<span class="pill bad">Over standard</span>';
+    if(k==="done"&&short>0)pills+=`<span class="pill warn">Short ${short}</span>`;
+    return `<div class="card job">
+      <div class="head"><div class="kv"><span class="no">Pick list ${esc(j.p)}</span><span class="tag">Last update ${j.updated?fDate(new Date(j.updated))+" "+fTime(new Date(j.updated)):"-"}</span></div><div class="pills">${pills}</div></div>
+      <div class="row">
+        <div class="kv"><span class="lbl">Picker</span><b>${esc(j.picker||"Not opened yet")}</b></div>
+        <div class="kv"><span class="lbl">Lines</span><b class="mono">${j.done} / ${j.lines}</b></div>
+        <div class="kv"><span class="lbl">Qty</span><b class="mono">${j.qty} / ${j.total}</b></div>
+        <div class="kv"><span class="lbl">Time / standard</span><b class="mono">${k==="new"?"-":dur(el)} / ${dur(std)}</b></div>
+      </div>
+      <div class="meter" role="img" aria-label="${pct}% of quantity picked"><i class="${pct>=100?"full":""}" style="width:${pct}%"></i></div>
+    </div>`}).join(""):'<div class="card muted">No pick lists issued yet. Issue one from Outbound, Picking.</div>';
+}
+setInterval(renderDash,1000);setInterval(loadDash,8000);
+$("fStore").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const v=$("storeUrl").value.trim(),m=$("storeMsg"),say=(t,c)=>{m.textContent=t;m.className=c};
+  if(!/^https?:\/\/\S+$/.test(v))return say("Paste the full web app URL. It starts with https:// and ends in /exec.","err");
+  say("Testing...","muted");
+  try{
+    const r=await fetch(v,{cache:"no-store"}),j=await r.json();if(!j.ok||!Array.isArray(j.jobs))throw new Error("Unexpected reply");
+    STORE=v;lsSet("bwms.store",v);DASH={jobs:j.jobs,now:j.now||Date.now(),at:Date.now()};dashErr="";
+    say("Connected. "+j.jobs.length+" pick list(s) in the Sheet.","ok-t");if(ORDER)renderAdmin($("aTag").hidden===false);renderDash();
+  }catch(err){say("Could not connect. Check the URL ends in /exec and the web app access is set to Anyone. ("+String(err&&err.message||err)+")","err")}
+});
+$("storeUrl").addEventListener("input",()=>{$("storeMsg").textContent=""});
+$("mDash").addEventListener("click",e=>{e.preventDefault();show("pDash");renderDash();loadDash()});
+$("btnDashMenu").addEventListener("click",()=>show("pMenu"));
+$("btnSumMenu").addEventListener("click",()=>show("pMenu"));
+const issue=()=>send("issue",{lines:ORDER.lines.length,total:ORDER.total,uom:ORDER.uom});
+
+/* ---------- Admin ---------- */
+function renderAdmin(sample){
+  $("aTitle").textContent="Pick list "+ORDER.p;$("aTag").hidden=!sample;
+  $("aFacts").innerHTML=factsHtml(orderFacts());
+  $("aTable").innerHTML="<tr><th>Line</th><th>Location</th><th>Pallet</th><th>Product code</th><th>Description</th><th>Task qty</th></tr>"+
+    ORDER.lines.map(l=>`<tr><td>${l.n}</td><td>${esc(l.loc)}</td><td class="mono">${esc(l.pallet)}</td><td class="mono">${esc(l.sku)}</td><td>${esc(l.desc)}</td><td>${l.task} ${esc(l.uom)}</td></tr>`).join("");
+  $("link").value=location.href.split("#")[0]+"#"+enc(STORE?Object.assign({},RAW,{u:STORE}):RAW);
+  const ls=$("linkStore");ls.textContent=STORE?"Dashboard connected: this pick list will report to the Outbound dashboard.":"Dashboard not connected. Set the Google Sheet connection in Outbound dashboard first.";
+  ls.style.color=STORE?"var(--ok)":"var(--bad)";
+}
+async function loadPdf(file){
+  const m=$("fileMsg"),say=(t,bad)=>{m.textContent=t;m.className=bad?"err":"ok-t";m.hidden=false};
+  if(!file)return;
+  if(!/\.pdf$/i.test(file.name)&&file.type!=="application/pdf")return say("That file is not a PDF. Choose the pick ticket PDF from Infolog.",true);
+  if(!window.pdfjsLib)return say("The PDF reader did not load. Check the internet connection and reload the page.",true);
+  say("Reading "+file.name+"...");
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise,pages=[];
+    for(let p=1;p<=doc.numPages;p++){const tc=await(await doc.getPage(p)).getTextContent();
+      pages.push(tc.items.filter(i=>i.str.trim()).map(i=>({x:i.transform[4],y:i.transform[5],s:i.str.trim()})))}
+    const o=parseTicket(pages);
+    if(!o.L.length)return say("No pick lines found in "+file.name+". Check it is a Pick List By Order PDF, not a scan.",true);
+    setOrder(o);renderAdmin(false);say("Loaded "+file.name+": pick list "+ORDER.p+", "+ORDER.lines.length+" lines, "+ORDER.total+" "+ORDER.uom+". Check the lines below, then copy the link.");
+  }catch(e){say("Could not read "+file.name+". "+(e&&e.message?e.message:""),true)}
+}
+$("file").addEventListener("change",e=>{loadPdf(e.target.files[0]);e.target.value=""});
+const dz=$("drop");
+["dragenter","dragover"].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.add("over")}));
+["dragleave","drop"].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.remove("over")}));
+dz.addEventListener("drop",e=>loadPdf(e.dataTransfer.files[0]));
+$("btnLink").addEventListener("click",()=>{
+  const t=$("link"),b=$("btnLink"),ok=()=>{b.textContent="Link copied";setTimeout(()=>b.textContent="Copy picker link",1800)};
+  const fb=()=>{t.focus();t.select();b.textContent="Link selected - press Copy"};
+  issue();
+  try{navigator.clipboard.writeText(t.value).then(ok,fb)}catch(e){fb()}
+});
+$("btnOpen").addEventListener("click",()=>{issue();openLogin()});
+$("btnBack").addEventListener("click",()=>show("pAdmin"));
+$("mPick").addEventListener("click",e=>{e.preventDefault();show("pAdmin")});
+function openGroup(name){
+  document.querySelectorAll(".group").forEach(g=>{const on=g.dataset.g===name;
+    g.classList.toggle("open",on);g.querySelector("button").setAttribute("aria-expanded",String(on));g.querySelector(".sub").hidden=!on});
+}
+document.querySelectorAll(".group>button").forEach(b=>b.addEventListener("click",()=>{const g=b.parentNode;openGroup(g.classList.contains("open")?"":g.dataset.g)}));
+document.querySelectorAll("[data-soon]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();$("soonNote").hidden=false}));
+openGroup("inbound");
+$("btnMenu").addEventListener("click",()=>show("pMenu"));
+
+/* ---------- Picker ---------- */
+function openLogin(){
+  $("lTitle").textContent="Pick list "+ORDER.p;$("lFacts").innerHTML=factsHtml(orderFacts());
+  $("uid").value="";$("loginErr").hidden=true;$("btnBack").hidden=fromLink;$("btnSumMenu").hidden=fromLink;show("pLogin");
+}
+$("fLogin").addEventListener("submit",e=>{
+  e.preventDefault();
+  const v=$("uid").value.trim(),err=$("loginErr"),name=USERS.find(u=>u.toLowerCase()===v.toLowerCase());
+  if(!name){err.textContent=v?'"'+v+'" is not a registered name. Check with your supervisor.':"Enter your name.";err.hidden=false;return}
+  err.hidden=true;
+  clearInterval(S.tick);
+  S={name,start:new Date(),end:null,last:Date.now(),ms:{},res:ORDER.lines.map(()=>null)};
+  $("who").textContent=name;$("barNo").textContent=ORDER.p;
+  send("start",{picker:name});
+  renderLines();show("pPick");
+  S.tick=setInterval(tick,1000);tick();
+});
+$("uid").addEventListener("input",()=>$("loginErr").hidden=true);
+function tick(){
+  const el=(S.end||new Date())-S.start,rem=ORDER.std-el,b=$("left");
+  $("timer").textContent=dur(el);
+  b.textContent=rem>=0?"Left "+dur(rem):"Over "+dur(-rem);b.classList.toggle("over",rem<0);
+}
+
+const STATUS='<option value="OK">OK - no issue</option><option>Damaged</option><option>Missing</option><option>Insufficient</option><option value="No replacement">No replacement - stop this SKU</option>';
+function renderLines(){
+  $("lines").innerHTML=ORDER.lines.map((l,i)=>`
+  <div class="card" id="c${i}">
+    <div class="head">
+      <div class="kv"><span class="lbl">Line ${l.n} · pick from</span><span class="loc">${esc(l.loc)}</span></div>
+      <div class="kv" style="text-align:right"><span class="lbl">Task qty</span><span class="need">${l.task} ${esc(l.uom)}</span></div>
+    </div>
+    <div class="row">
+      <div class="kv"><span class="lbl">Pallet</span><b class="mono">${esc(l.pallet)}</b></div>
+      <div class="kv"><span class="lbl">Product code</span><b class="mono">${esc(l.sku)}</b></div>
+    </div>
+    <div class="kv"><span class="lbl">Description · ${esc(l.pack)}</span><b>${esc(l.desc)}</b></div>
+    <div class="row">
+      <label for="q${i}">Qty picked at ${esc(l.loc)}<input id="q${i}" type="number" inputmode="numeric" min="0" max="${l.task}"></label>
+      <label for="s${i}">Item status<select id="s${i}">${STATUS}</select></label>
+    </div>
+    <div id="aw${i}" class="alt" hidden>
+      <span class="lbl">Alternate location pick</span>
+      <label for="a${i}">Picked from (alternate location)<input id="a${i}" autocomplete="off" placeholder="Key in location, e.g. HJ-18-05-2"></label>
+      <div class="row">
+        <label for="aq${i}">Qty picked (alternate)<input id="aq${i}" type="number" inputmode="numeric" min="0" max="${l.task}"></label>
+        <label for="as${i}">Item status (alternate)<select id="as${i}">${STATUS}</select></label>
+      </div>
+    </div>
+    <div id="e${i}" class="err" hidden></div>
+    <div id="r${i}" hidden></div>
+    <button type="button" id="b${i}">Confirm line ${l.n}</button>
+  </div>`).join("");
+  ORDER.lines.forEach((l,i)=>{
+    $("s"+i).addEventListener("change",()=>{$("aw"+i).hidden=!NEEDS_ALT.includes($("s"+i).value);$("e"+i).hidden=true});
+    ["q","a","aq","as"].forEach(k=>$(k+i).addEventListener("input",()=>$("e"+i).hidden=true));
+    $("b"+i).addEventListener("click",()=>S.res[i]?edit(i):confirmLine(i));
+  });
+  progress();
+}
+function confirmLine(i){
+  const l=ORDER.lines[i],qv=$("q"+i).value.trim(),st=$("s"+i).value,e=$("e"+i),useAlt=NEEDS_ALT.includes(st);
+  const alt=useAlt?$("a"+i).value.trim().toUpperCase():"",aqv=$("aq"+i).value.trim(),ast=useAlt?$("as"+i).value:"";
+  const fail=m=>{e.textContent=m;e.hidden=false};
+  const q=Number(qv);
+  if(qv===""||!Number.isInteger(q)||q<0)return fail("Enter the quantity picked (0 or more).");
+  if(q>l.task)return fail("Qty picked cannot be more than the task qty of "+l.task+".");
+  if(q<l.task&&st==="OK")return fail("Short by "+(l.task-q)+". Select Damaged, Missing, Insufficient or No replacement.");
+  let aq=0;
+  if(useAlt){
+    if(!alt)return fail("Key in the alternate location you picked from, or select No replacement.");
+    aq=Number(aqv);
+    if(aqv===""||!Number.isInteger(aq)||aq<0)return fail("Enter the quantity picked at the alternate location (0 or more).");
+    if(q+aq>l.task)return fail("Total picked ("+(q+aq)+") cannot be more than the task qty of "+l.task+".");
+    if(q+aq<l.task&&ast==="OK")return fail("Still short by "+(l.task-q-aq)+". Select the alternate item status.");
+  }
+  if(!(i in S.ms)){const now=Date.now();S.ms[i]=now-S.last;S.last=now}
+  S.res[i]={q,st,alt,aq,ast,t:q+aq,ms:S.ms[i]};
+  lock(i,true);progress();
+  send("line",{picker:S.name,done:S.done,qty:S.qty,line:{n:l.n,loc:l.loc,pallet:l.pallet,sku:l.sku,task:l.task,q,st,alt,aq,ast,t:q+aq,sec:Math.round(S.ms[i]/1000)}});
+}
+function edit(i){S.res[i]=null;lock(i,false);progress()}
+function lock(i,on){
+  const r=S.res[i],l=ORDER.lines[i],c=$("c"+i);
+  ["q","s","a","aq","as"].forEach(k=>$(k+i).disabled=on);
+  $("b"+i).textContent=(on?"Edit line ":"Confirm line ")+l.n;
+  $("b"+i).className=on?"ghost":"";
+  const stop=on&&(r.st==="No replacement"||r.ast==="No replacement");
+  c.classList.toggle("done",on&&!stop);c.classList.toggle("stop",stop);
+  const box=$("r"+i);box.hidden=!on;
+  if(on)box.innerHTML=pill(r,l)+` <span class="muted mono">· ${dur(r.ms)}</span>`;
+}
+function pill(r,l){
+  if(r.st==="No replacement")return `<span class="pill bad">Stopped · no replacement · ${r.q}/${l.task}</span>`;
+  if(r.st==="OK")return `<span class="pill ok">Picked ${r.q}/${l.task}</span>`;
+  const k=r.ast==="No replacement"?"bad":r.t<l.task?"warn":"ok";
+  return `<span class="pill warn">${r.st} · ${r.q} at ${esc(l.loc)}</span> <span class="pill ${k}">Alt ${esc(r.alt)} · ${r.aq} · ${r.ast}</span> <span class="pill ${k}">Total ${r.t}/${l.task}</span>`;
+}
+function progress(){
+  const done=S.res.filter(Boolean).length,q=S.res.reduce((t,r)=>t+(r?r.t:0),0);
+  $("prog").textContent=done+" of "+ORDER.lines.length+" lines · "+q+"/"+ORDER.total+" "+ORDER.uom;
+  S.done=done;S.qty=q;
+  $("finErr").hidden=true;
+}
+$("btnFinish").addEventListener("click",()=>{
+  const open=ORDER.lines.filter((l,i)=>!S.res[i]).map(l=>l.n);
+  if(open.length){$("finErr").textContent="Confirm line "+open.join(", ")+" before finishing.";$("finErr").hidden=false;return}
+  S.end=new Date();clearInterval(S.tick);send("finish",{done:S.done,qty:S.qty,short:ORDER.total-S.qty});summary();show("pSum");syncMsg();
+});
+function summary(){
+  const tot=S.res.reduce((t,r)=>t+r.t,0),short=ORDER.total-tot;
+  $("sTitle").textContent="Pick list "+ORDER.p+" picked";
+  const el=S.end-S.start,vs=el<=ORDER.std?"Within by "+dur(ORDER.std-el):"Over by "+dur(el-ORDER.std);
+  const facts=[["Pick list",ORDER.p],["Picked by",S.name],["Date picked",fDate(S.end)],["Start",fTime(S.start)],["End",fTime(S.end)],
+    ["Total time",dur(el)],["Standard time",dur(ORDER.std)],["Against standard",vs],["Qty picked",tot+" / "+ORDER.total+" "+ORDER.uom],["Short",short+" "+ORDER.uom]];
+  $("sumFacts").innerHTML=factsHtml(facts);
+  const H=["Line","Location","Pallet","Product code","Task","Picked","Status","Alt location","Alt qty","Alt status","Total","Time"];
+  const rows=ORDER.lines.map((l,i)=>{const r=S.res[i];return [l.n,l.loc,l.pallet,l.sku,l.task,r.q,r.st,r.alt||"-",r.alt?r.aq:"-",r.ast||"-",r.t,dur(r.ms)]});
+  $("sumTable").innerHTML="<tr>"+H.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("");
+  S.tsv=facts.map(f=>f.join("\t")).concat(["",H.join("\t")],rows.map(r=>r.join("\t"))).join("\n");
+  const td=(c,t)=>"<"+t+' style="border:1px solid #999;padding:4px 8px;text-align:left">'+esc(c)+"</"+t+">";
+  S.html="<table>"+facts.map(f=>"<tr>"+td(f[0],"th")+td(f[1],"td")+"</tr>").join("")+"</table><br><table><tr>"+H.map(h=>td(h,"th")).join("")+"</tr>"+rows.map(r=>"<tr>"+r.map(c=>td(c,"td")).join("")+"</tr>").join("")+"</table>";
+  $("sumText").value=S.tsv;$("sumText").hidden=true;
+  const wa=["*PICK LIST "+ORDER.p+"*","Picked by: "+S.name,"Date: "+fDate(S.end),"Time: "+fTime(S.start)+" - "+fTime(S.end)+" ("+dur(el)+")","Standard: "+dur(ORDER.std)+" | "+vs,
+    "Picked: "+tot+" / "+ORDER.total+" "+ORDER.uom+(short?" (short "+short+")":"")];
+  ORDER.lines.forEach((l,i)=>{const r=S.res[i];
+    wa.push("","*Line "+l.n+"* "+l.loc+" | "+l.pallet,l.sku+" "+l.desc,"Task "+l.task+" | Picked "+r.q+" | "+r.st);
+    if(r.alt)wa.push("Alt "+r.alt+": "+r.aq+" | "+r.ast);
+    wa.push("Total "+r.t+" / "+l.task+" | "+dur(r.ms))});
+  $("btnWa").href="https://wa.me/?text="+encodeURIComponent(wa.join("\n"));
+}
+$("btnCopy").addEventListener("click",()=>{
+  const t=$("sumText"),b=$("btnCopy"),ok=()=>{b.textContent="Copied";setTimeout(()=>b.textContent="Copy report as table (Excel or email)",1800)};
+  const fb=()=>{t.hidden=false;t.focus();t.select();b.textContent="Text selected - press Copy"};
+  const plain=()=>{try{navigator.clipboard.writeText(S.tsv).then(ok,fb)}catch(e){fb()}};
+  try{navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([S.html],{type:"text/html"}),"text/plain":new Blob([S.tsv],{type:"text/plain"})})]).then(ok,plain)}catch(e){plain()}
+});
+
+/* ---------- Start: a link with a pick list opens the picker page; otherwise the admin page ---------- */
+(function(){
+  const h=location.hash.slice(1);
+  if(h.length>20){try{const o=dec(h);if(o&&o.L&&o.L.length){if(o.u)STORE=o.u;setOrder(o);fromLink=true;syncMsg();if(OUT.length)flush();openLogin();return}}catch(e){}}
+  setOrder(SAMPLE);renderAdmin(true);show("pMenu");syncMsg();if(OUT.length)flush();
+})();
+</script>
+
+</body>
+</html>
